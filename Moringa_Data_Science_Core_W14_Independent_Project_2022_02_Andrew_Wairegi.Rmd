@@ -1,0 +1,238 @@
+---
+title: "Sales strategies - Carrefour"
+author: "Andrew Wairegi"
+date: "3/2/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Defining the Question
+### Specifying the question
+To determine the most relevant sales strategies for the marketing team
+at Carrefour.
+
+### Defining metric for succcess
+To be able to create recommendations for the sales team, at Carrefour
+
+### Understanding the context
+Carrefour is a leading supermarket brand in Kenya. That has made it's presence known
+in Kenya for the last 5 years. It has been in several supermarket stores, including 
+TRM & Garden city. They would like to develop more sales strategies to increase their
+overall sales.
+
+### Experimental design
+1. Loading the data
+2. Data cleaning
+2. Dimensionality reduction
+3. Feature selection
+4. Association rules
+5. Anomaly detection
+6. Recommendation
+
+
+### Data relevance
+The data is relevant because it has been sourced for a Carrefour supermarket. Which means
+that the data is relevant, and authentic. This means it can be used in our analysis, to create
+a recommendation for the Carrefour supermarket chain.
+
+
+## Loading the dataset
+```{R}
+# Loading the libraries
+library(data.table) # High-performance dataframe package
+library(tidyverse) # A Data exploration & visualization Package
+library(corrr) # A Correlation package
+library(dplyr) # A Data Manipulation package
+library(arules)# A Association package
+library(anomalize)# A Anomaly package
+
+```
+
+```{R}
+# Loading the datasets
+# Dataset 1
+df = fread("Supermarket_dataset1.csv")
+head(df)
+```
+
+```{R}
+# Dataset 2
+df2 = read.transactions("Supermarket_dataset2.csv")
+head(df2)
+```
+
+```{R}
+# Dataset 3
+df3 = fread("Supermarket_dataset3.csv")
+head(df3)
+```
+
+## Data cleaning
+```{R}
+# Checking for null values
+# Dataframe 1
+colSums(is.na(df))
+```
+
+```{R}
+# Note: Duplicated and null values
+# are automatically removed from dataframe 2, during reading.
+```
+
+```{R}
+# Dataframe 3
+colSums(is.na(df3))
+```
+
+```{R}
+# Checking for duplicates
+# Dataframe 1
+sum(duplicated(df))
+```
+```{R}
+# Note: duplicates have already been removed for
+# dataframe 2
+```
+```{R}
+# Dataframe 3
+sum(duplicated(df3))
+```
+
+```{R}
+# Checking for outliers
+
+# Dataframe 1
+cat("Unit price:", max(df$`Unit price`), "\n")
+cat("Tax: ", max(df$Tax), "\n")
+cat("Gross margin percentage: ",  max(df$`gross margin percentage`), "\n")
+cat("Gross income: ", max(df$`gross income`), "\n")
+cat("Rating: ", max(df$Rating), "\n")
+cat("Total: ", max(df$Total))
+```
+```{R}
+itemFrequencyPlot(df2, topN = 10,col="darkgreen")
+```
+
+There are no clear outliers. So the data is clean
+
+
+```{R}
+max(df3$Sales)
+```
+A max sale of 1042 is ok. Because their are other sales,
+over $500.
+
+## Dimensionality reduction
+
+Note: Dimensionality reduction, is being done with
+dataset 1.
+
+```{R}
+head(df)
+```
+
+```{R}
+df_analysis = select(df, `Unit price`, Quantity, Tax)
+PCA <- prcomp(df_analysis, center = TRUE, scale. = TRUE) # Note some columns had zero variance, so they could not be scaled
+```
+
+```{R}
+summary(PCA)
+```
+Note: The first principal component explains for 65.13% of the variance. While the second principal component, explains for 32.98% of the variance. This means we can get most of our variables that explain variance from the first & second principal component.
+
+```{R}
+PCA
+```
+Based on the PCA. We can see that tax explains the most variance in the dataset.
+Then quantity. Then unit price. However in the second principal component, price is the most important indicator.
+
+```{R}
+plot(df$Total, df$`Unit price`, xlab = "Total sales", ylab = "Unit Price")
+```
+
+It seems that for different product categories. As the unit price increases, the sales
+increase. This might be that more expensive products in one line, sell more. When compared to cheaper products in the same line. For example, a cheap hair brush vs a expensive hair brush.
+
+
+## Feature selection
+
+If we were to create a model we would need to do feature selection.
+So to practise that now would be a good idea in case we need to create a model in the future.
+
+```{R}
+correlation = correlate(select_if(df, is.numeric))
+correlation
+```
+
+```{R}
+correlation[, c("term", "Total")]
+```
+
+It seems that tax & cost of goods are perfect correlators of the total
+sales. However, this is because they are directly part of the total. As they are
+constants, that will be used to create the total.
+
+However unit price is a good indicator of how much an item will sell. As it may relate
+to how expensive the item is in the supermarket. Also quantity is another good indicator,
+as it relates to how popular the item is already in the supermarket. So it will determine how
+many times the item will be bought in the future. 
+
+So unit price determines it by about 63%, and quantity by about 60%. Once you take 
+in to account that we are no longer looking at quantity as a current value, but a past value.
+
+## Association rules
+
+Note: we will use dataset two to find out the most popular products in the store.
+This will allow us to find out which other products should be stocked, other than just looking
+at price.
+
+```{R}
+# Top 20 items in store
+itemFrequencyPlot(df2, topN = 20,col="darkgreen")
+```
+
+In terms of raw products. The most popular items are: Tea, Wheat, Water, Fat, Yogurt, Fries, 
+and Frozen products. The other items were less than 4%, in the database. This means that these are the
+most popular items in raw counts.
+
+
+```{R}
+associations <- apriori (df2, parameter = list(supp = 0.001, conf = 0.8))
+inspect(associations[1:10])
+```
+```{R}
+length(associations)
+```
+
+It seems there are many combinations that go with the products that people buy.
+However the most frequently bought combinations are:  (cookies + low yoghurt), (cookies + fat yoghurt), 
+(burgers + whole wheat), (fries + escalopes + pasta + mushroom + cream), (fries + cookies + green tea),
+(shrimp + whole wheat). Amongst others. This means that there are several options that the supermarket can
+stock on. To increase sales. This would give them an edge, when compared to other supermarkets.
+
+## Anomaly Detection
+
+```{R}
+anomally_df = anomalize(data = as_tibble(df3), target = "Sales")
+anomalies = anomally_df[anomally_df$anomaly == "Yes",]
+anomalies[, c("Date", "Sales", "anomaly")]
+```
+
+Note: There are no anomalies. This means that this data is true. That every record is accurate.
+This means I can trust the observations. That the analysis is correct.
+
+
+
+## Recommendation
+
+The best thing that the supermarket can do is stock up on the items that are most sold.
+This will allow them to be always prepared for a rush for these items. As well as this they can 
+put items that are most commonly bought together, in the same place. So that shoppers are more easily able
+to buy them. This may also increase the number of items that are bought, in pairs. As well as this, they 
+can also think of introducing more variety in to these product lines that are frequently bought. For example,
+a burger bar, or different varieties of flavoured water. To increase sales. This will increase sales, and will
+increase customer reliability in the store. These are the tips that I can give to Carrefour supermarket brand.
